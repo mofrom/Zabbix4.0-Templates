@@ -1,7 +1,6 @@
 #!/bin/bash 
 #Desc：自动部署zabbix 监控 MySQL 状态 agent端 说明执行改脚本需要传入主机、用户名、密码、端口信息。
 #Date：2019-5-6
-#by：Lee-YJ
 
 
 #MySQL连接信息
