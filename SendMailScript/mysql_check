@@ -1,0 +1,130 @@
+#!/bin/bash 
+#Desc：自动部署zabbix 监控 MySQL 状态 agent端 说明执行改脚本需要传入主机、用户名、密码、端口信息。
+#Date：2019-5-6
+#by：Lee-YJ
+
+
+#MySQL连接信息
+function MySQLInfo {
+    read -p "主机：" HOST
+    read -p "用户：" USER
+    read -p "密码：" PASSWORD
+    read -p "端口：" PORT
+}
+
+#创建mysql_status脚本
+function MySQLScript {
+cat >>/etc/zabbix/script/mysql_status.sh<<EOF
+#!/bin/bash 
+#Desc：zabbix 监控 MySQL 状态
+#Date：2019-5-6
+#by：Lee-YJ
+
+#主机
+HOST=$HOST
+#用户
+USER=$USER
+#密码
+PASSWORD=$PASSWORD
+#端口
+PORT=$PORT
+#MySQL连接
+CONNECTION="mysqladmin -h ${HOST} -u ${USER} -P ${PORT} -p${PASSWORD}"
+
+if [ \$# -ne "1" ];then
+    echo "arg error!"
+fi
+
+case \$1 in
+    Uptime)
+        result=\`\${CONNECTION} status 2>/dev/null |awk '{print \$2}'\`
+        echo \$result
+        ;;
+    Questions)
+        result=\`\${CONNECTION} status 2>/dev/null |awk '{print \$6}'\`
+        echo \$result
+        ;;
+    Com_update)
+        result=\`\${CONNECTION} extended-status 2>/dev/null |grep -w "Com_update" |awk '{print \$4}'\`
+        echo \$result
+        ;;
+    Slow_queries)
+        result=\`\${CONNECTION} extended-status 2>/dev/null |grep -w "Slow_queries" |awk '{print \$4}'\`
+        echo \$result
+        ;;
+    Com_select)
+        result=\`\${CONNECTION} extended-status 2>/dev/null |grep -w "Com_select" |awk '{print \$4}'\`
+        echo \$result
+        ;;
+    Com_rollback)
+        result=\`\${CONNECTION} extended-status 2>/dev/null |grep -w "Com_rollback" |awk '{print \$4}'\`
+        echo \$result
+        ;;
+    Com_insert)
+        result=\`\${CONNECTION} extended-status 2>/dev/null |grep -w "Com_insert" |awk '{print \$4}'\`
+        echo \$result
+        ;;
+    Com_delete)
+        result=\`\${CONNECTION} extended-status 2>/dev/null |grep -w "Com_delete" |awk '{print \$4}'\`
+        echo \$result
+        ;;
+    Com_commit)
+        result=\`\${CONNECTION} extended-status 2>/dev/null |grep -w "Com_commit" |awk '{print \$4}'\`
+        echo \$result
+        ;;
+    Bytes_sent)
+        result=\`\${CONNECTION} extended-status 2>/dev/null |grep -w "Bytes_sent" |awk '{print \$4}'\`
+        echo \$result
+        ;;
+    Bytes_received)
+        result=\`\${CONNECTION} extended-status 2>/dev/null |grep -w "Bytes_received" |awk '{print \$4}'\`
+        echo \$result
+        ;;
+    Com_begin)
+        result=\`\${CONNECTION} extended-status 2>/dev/null |grep -w "Com_begin" |awk '{print \$4}'\`
+        echo \$result
+        ;;
+    *)
+        echo "Usage:\$0(Uptime|Questions|Com_update|Slow_queries|Com_select|Com_rollback|Com_insert|Com_delete|Com_commit|Bytes_sent|Bytes_received|Com_begin)"
+        ;;
+esac
+EOF
+    chmod +x /etc/zabbix/script/mysql_status.sh
+}
+
+#配置agent mysql配置文件
+function Config {
+cp /etc/zabbix/zabbix_agentd.d/userparameter_mysql.conf{,back}
+cat >/etc/zabbix/zabbix_agentd.d/userparameter_mysql.conf<<EOF
+# 获取MySQL性能指标，这个是上一步编辑好的脚本
+UserParameter=mysql.status[*],/etc/zabbix/script/mysql_status.sh \$1
+# 获取MySQL运行状态
+UserParameter=mysql.ping,mysqladmin -u $USER -h $HOST -p$PASSWORD ping 2>/dev/null | grep -c alive
+# 获取MySQL版本
+UserParameter=mysql.version,mysql -V
+EOF
+}
+
+function main {
+#创建脚本存放路径
+mkdir /etc/zabbix/script
+MySQLInfo
+MySQLScript
+Config
+#重启zabbix-agent
+service zabbix-agent restart
+}
+
+main
+
+auto_config_agent.sh
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# vim /etc/zabbix/zabbix_agentd.d/userparameter_mysql.conf
+#获取MySQL性能指标，这个是上一步编辑好的脚本
+UserParameter=mysql.status[*],/etc/zabbix/script/mysql_status.sh $1
+#获取MySQL运行状态
+UserParameter=mysql.ping,mysqladmin -u root -h localhost -pIjRMv3l6TQIEjvb9nIX5 ping 2>/dev/null | grep -c alive
+#获取MySQL版本
+UserParameter=mysql.version,mysql -V
